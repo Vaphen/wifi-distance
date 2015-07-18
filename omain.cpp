@@ -28,6 +28,10 @@ public:
 		myPoint = new Point;
 		drawArea = gtk_drawing_area_new();
 		g_signal_connect (drawArea, "draw", G_CALLBACK(&this->draw_cb),  myPoint);
+
+		/* initialize average */
+		NetworkInformation netInfos;
+		average = netInfos.getSignalstrength();
 	}
 
 	~DrawingArea() {
@@ -84,15 +88,24 @@ private:
 	   cairo_set_source_rgb(cr, 0.8, 0, 0);
 
 	   Point *myPoint = (Point*) data;
+
+
+
 	   NetworkInformation netInfos;
 
 	   for(int i = 0; i < 10; i++) {
-		   std::this_thread::sleep_for(std::chrono::milliseconds(100));
-		   average += netInfos.getSignalstrength();
+		   std::this_thread::sleep_for(std::chrono::milliseconds(300));
+		   int curStrength = netInfos.getSignalstrength();
+		   if(curStrength < average - 3 || curStrength > average + 3) {
+			   std::cout << curStrength << " und Durchschnitt: " << average << std::endl;
+			   average = curStrength;
+		   }else {
+			   std::cout << "anders:" << curStrength << " und Durchschnitt: " << average << std::endl;
+		   }
 	   }
 
-	   myPoint->x = ((average / 10) * -7) - (((average / 10) * -7) % 100);
-	   average = 0;
+	   myPoint->x = average * -3;
+
 	   cairo_arc(cr, myPoint->x, myPoint->y, 10, 0, 2*G_PI);
 	   cairo_fill(cr);
 
