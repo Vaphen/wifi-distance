@@ -17,6 +17,7 @@ struct Point{
 };
 
 static int average = 0;
+static int oldAverage = 0;
 
 class DrawingArea {
 private:
@@ -90,7 +91,9 @@ private:
 		   std::this_thread::sleep_for(std::chrono::milliseconds(100));
 		   average += netInfos.getSignalstrength();
 	   }
-	   myPoint->x = (average / 10) * -5;
+	   if(oldAverage / average < 0.875 || oldAverage / average > 1.166666)
+		   myPoint->x = (average / 10) * -5;
+	   oldAverage = average;
 	   average = 0;
 	   cairo_arc(cr, myPoint->x, myPoint->y, 10, 0, 2*G_PI);
 	   cairo_fill(cr);
