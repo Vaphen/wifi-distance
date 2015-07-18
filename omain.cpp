@@ -1,5 +1,7 @@
 #include <gtk/gtk.h>
 #include <iostream>
+#include <chrono>
+#include <thread>
 #include "distance.h"
 
 #define WINDOW_WIDTH  800
@@ -14,10 +16,13 @@ struct Point{
 	int y;
 };
 
+static int average = 0;
+
 class DrawingArea {
 private:
 	GtkWidget *drawArea;
 	Point *myPoint;
+
 public:
 	DrawingArea() {
 		myPoint = new Point;
@@ -80,7 +85,13 @@ private:
 
 	   Point *myPoint = (Point*) data;
 	   NetworkInformation netInfos;
-	   myPoint->x = netInfos.getSignalstrength() * -5;
+
+	   for(int i = 0; i < 10; i++) {
+		   std::this_thread::sleep_for(std::chrono::milliseconds(100));
+		   average += netInfos.getSignalstrength();
+	   }
+	   myPoint->x = (average / 10) * -5;
+	   average = 0;
 	   cairo_arc(cr, myPoint->x, myPoint->y, 10, 0, 2*G_PI);
 	   cairo_fill(cr);
 
