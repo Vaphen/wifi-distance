@@ -81,15 +81,15 @@ private:
 
 
 	   NetworkInformation netInfos;
-
-	   if(average * -8 >= myPoint->x)
+	   int curStrength = netInfos.getSignalstrength();
+	   if(curStrength * -8 > myPoint->x)
 		   myPoint->x += 1;
-	   else if(average * -8 <= myPoint->x)
+	   else if(curStrength * -8 < myPoint->x)
 		   myPoint->x -= 1;
 	   else {
 		   for(int i = 0; i < 3; i++) {
 			   std::this_thread::sleep_for(std::chrono::milliseconds(300));
-			   int curStrength = netInfos.getSignalstrength();
+
 			   if(curStrength < average - 3 || curStrength > average + 3) {
 				   std::cout << curStrength << " und Durchschnitt: " << average << std::endl;
 				   average = curStrength;
@@ -109,7 +109,7 @@ private:
 	   cairo_move_to(cr, 15, WINDOW_HEIGHT - 50);
 	   cairo_show_text(cr, std::string("Connected to: ").append(netInfos.getESSID()).c_str());
 	   cairo_move_to(cr, 15, WINDOW_HEIGHT - 30);
-	   cairo_show_text(cr, std::to_string(average).append(" dBm").c_str());
+	   cairo_show_text(cr, std::to_string(curStrength).append(" dBm").c_str());
 
 
 	   gtk_widget_queue_draw(widget);
