@@ -66,22 +66,12 @@ private:
 
 
 	   /* set router properties */
-	   cairo_set_source_rgb(cr, 0, 0, 0.8);
-	   cairo_set_line_width(cr,6);
+	  // cairo_set_source_rgb(cr, 0, 0, 0.8);
+	  // cairo_set_line_width(cr,6);
 
 	   /* draw 4 routers */
-	   cairo_rectangle (cr, 0, 0, 100, 100);
-	   cairo_fill(cr);
-
-	   cairo_rectangle (cr, 700, 700, 100, 100);
-	   cairo_fill(cr);
-
-	   cairo_rectangle (cr, 0, 700, 100, 100);
-	   cairo_fill(cr);
-
-	   cairo_rectangle (cr, 700, 0, 100, 100);
-	   cairo_fill(cr);
-
+	  // cairo_rectangle (cr, 0, 0, 100, 100);
+	  // cairo_fill(cr);
 
 
 	   /* draw person point */
@@ -90,24 +80,37 @@ private:
 	   Point *myPoint = (Point*) data;
 
 
-
 	   NetworkInformation netInfos;
 
-	   for(int i = 0; i < 10; i++) {
-		   std::this_thread::sleep_for(std::chrono::milliseconds(300));
-		   int curStrength = netInfos.getSignalstrength();
-		   if(curStrength < average - 3 || curStrength > average + 3) {
-			   std::cout << curStrength << " und Durchschnitt: " << average << std::endl;
-			   average = curStrength;
-		   }else {
-			   std::cout << "anders:" << curStrength << " und Durchschnitt: " << average << std::endl;
+	   if(average * -8 >= myPoint->x)
+		   myPoint->x += 1;
+	   else if(average * -8 <= myPoint->x)
+		   myPoint->x -= 1;
+	   else {
+		   for(int i = 0; i < 3; i++) {
+			   std::this_thread::sleep_for(std::chrono::milliseconds(300));
+			   int curStrength = netInfos.getSignalstrength();
+			   if(curStrength < average - 3 || curStrength > average + 3) {
+				   std::cout << curStrength << " und Durchschnitt: " << average << std::endl;
+				   average = curStrength;
+			   }else {
+				   std::cout << "anders:" << curStrength << " und Durchschnitt: " << average << std::endl;
+			   }
 		   }
+
+		   myPoint->x = average * -8;
 	   }
-
-	   myPoint->x = average * -3;
-
 	   cairo_arc(cr, myPoint->x, myPoint->y, 10, 0, 2*G_PI);
 	   cairo_fill(cr);
+
+	   /* show current dbm (signalstrength) */
+	   cairo_set_source_rgb(cr, 0, 0, 0);
+	   cairo_set_font_size(cr, 18);
+	   cairo_move_to(cr, 15, WINDOW_HEIGHT - 50);
+	   cairo_show_text(cr, std::string("Connected to: ").append(netInfos.getESSID()).c_str());
+	   cairo_move_to(cr, 15, WINDOW_HEIGHT - 30);
+	   cairo_show_text(cr, std::to_string(average).append(" dBm").c_str());
+
 
 	   gtk_widget_queue_draw(widget);
 
@@ -133,6 +136,19 @@ int main (int argc, char *argv[])
    gtk_window_set_resizable(GTK_WINDOW(window), FALSE);
 
    DrawingArea drawArea;
+
+
+   NetworkInformation info;
+   if(!info.performScanNetworksSuccess()) {
+	   std::cerr << "Scan failure!" << std::endl;
+	   std::cerr << "Try to rerun with root privileges!" << std::endl;
+	   exit(1);
+   }
+   for(networkInfo curinfo : info.getNetworkList()) {
+	   std::cout << curinfo.essid << std::endl;
+	   std::cout << curinfo.mac << std::endl;
+   }
+
 
    gtk_container_add(GTK_CONTAINER(window), drawArea.getDrawingArea());
    gtk_widget_show(drawArea.getDrawingArea());
