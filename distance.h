@@ -1,3 +1,6 @@
+#ifndef _DISTANCE_H_
+#define _DISTANCE_H_
+
 #include <iostream>
 #include <memory>
 #include <cstdio>
@@ -9,11 +12,13 @@
 #include <iwlib.h>
 #include <vector>
 
-enum ERROR { SCAN_NETWORK_ERROR };
+enum ERROR { GET_ESSID, GET_SIGNAL_STRENGTH, SCAN_NETWORK, READ_SCAN_RESULTS };
 
 struct networkInfo {
 		networkInfo() {
 			essid="";
+			mac = "";
+			level = 0;
 		}
 		std::string essid;
 		std::string mac;
@@ -38,18 +43,19 @@ public:
 	NetworkInformation();
 	~NetworkInformation();
 
-	bool performScanNetworksSuccess();
 	bool isSocketOpen();
 
 	std::string getESSID();
 	std::vector<networkInfo> getNetworkList();
 	int getSignalstrength();
 
+	void scanNetworks();
+
 private:
 
-
 	/* saves Data about available networks in data-section of struct iwreq */
-	bool intern_fillWreqStructWithNetworksSuccess(iwreq *wreq);
+
+	bool intern_fillWreqStructWithNetworksSuccess();
 
 	bool intern_scanNetworksSuccess();
 
@@ -61,6 +67,10 @@ private:
 	
 	bool intern_getAPMacSuccess();
 
+	void intern_updateNetworkList();
+
 
 
 };
+
+#endif

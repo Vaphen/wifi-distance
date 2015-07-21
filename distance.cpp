@@ -18,20 +18,6 @@ NetworkInformation::NetworkInformation() {
 		exit(1);
 	}
 
-	if (!intern_initializeESSIDSuccessfull()) {
-		std::cerr << "Get ESSID ioctl failed." << std::endl;
-		std::cerr << "errno = " << errno;
-		std::cerr << "Error description : " << strerror(errno) << std::endl;
-		exit(2);
-	}
-
-	if (!intern_initializeSignalstrengthSuccessfull()) {
-		std::cerr << "Get SignalLevel ioctl failed." << std::endl;
-		std::cerr << "errno = " << errno;
-		std::cerr << "Error description : " << strerror(errno) << std::endl;
-		exit(3);
-	}
-
 }
 
 NetworkInformation::~NetworkInformation() {
@@ -43,10 +29,14 @@ bool NetworkInformation::isSocketOpen() {
 }
 
 std::string NetworkInformation::getESSID() {
+	if (!intern_initializeESSIDSuccessfull())
+		throw ERROR::GET_ESSID;
 	return this->essid;
 }
 
 int NetworkInformation::getSignalstrength() {
+	if (!intern_initializeSignalstrengthSuccessfull())
+		throw ERROR::GET_SIGNAL_STRENGTH;
 	return this->signalStrength;
 }
 
@@ -54,84 +44,99 @@ std::vector<networkInfo> NetworkInformation::getNetworkList() {
 		return networkList;
 }
 
-bool NetworkInformation::performScanNetworksSuccess() {
-	return intern_scanNetworksSuccess();
+void NetworkInformation::scanNetworks() {
+		if (!intern_fillWreqStructWithNetworksSuccess())
+			throw ERROR::SCAN_NETWORK;
+		if(!intern_scanNetworksSuccess())
+			throw ERROR::READ_SCAN_RESULTS;
 }
 
 /* saves Data about available networks in data-section of struct iwreq */
-bool NetworkInformation::intern_fillWreqStructWithNetworksSuccess(iwreq *wreq) {
-	 int ret = (ioctl(sockfd, SIOCSIWSCAN, wreq));
+bool NetworkInformation::intern_fillWreqStructWithNetworksSuccess() {
+	 wreq = iwreq();
+	 strncpy(wreq.ifr_ifrn.ifrn_name, IW_INTERFACE, IFNAMSIZ);
+	 int ret = (ioctl(sockfd, SIOCSIWSCAN, &wreq));
 	 return (ret != -1);
 }
 
 bool NetworkInformation::intern_scanNetworksSuccess() {
 	wreq = iwreq();
+	networkList.clear();
 	strncpy(wreq.ifr_ifrn.ifrn_name, IW_INTERFACE, IFNAMSIZ);
-
-	if (!intern_fillWreqStructWithNetworksSuccess(&wreq))
-		return false;
 
 
 	char buf[0xffff]; /* u32 */
 
-	wreq.u.data.pointer = buf;
-	wreq.u.data.length = sizeof(buf);
-	wreq.u.data.flags = 0;
 
-	if(ioctl(sockfd, SIOCGIWSCAN, &wreq) < 0) {
-		std::cerr << "reading scn results failed" << std::endl;
+
+	std::clock_t startTimer = std::clock();
+	int counter = 0;
+	while(1) {
+		wreq.u.data.pointer = buf;
+		wreq.u.data.length = sizeof(buf);
+		wreq.u.data.flags = 0;
+		/* we got no answer in 10 secs, there must be a problem somewhere */
+		if(counter == 10)
+			return false;
+		if(ioctl(sockfd, SIOCGIWSCAN, &wreq) == 0)
+			break;
+		if((std::clock() - startTimer) / CLOCKS_PER_SEC <= 1)
+			continue;
+		counter++;
+		startTimer = std::clock();
 	}
 
 	struct iw_event myEvent;
 	struct stream_descr stream;
 	struct iw_range range;
 	memset(&stream, 0, sizeof(stream));
-	if(iw_get_range_info(sockfd, IW_INTERFACE, &range) < 0) {
-		std::cerr << "rangecheck failed" << std::endl;
-	}
+
+	if(iw_get_range_info(sockfd, IW_INTERFACE, &range) < 0)
+		return false;
 
 	iw_init_event_stream(&stream, (char *) buf, wreq.u.data.length);
+
 	int ret = 0;
-	for(int i = 0; i < 500; i++) {
-		ret = iw_extract_event_stream(&stream, &myEvent, range.we_version_compiled);
+	networkInfo *curNetwork = new networkInfo;
+	while(iw_extract_event_stream(&stream, &myEvent, range.we_version_compiled) > 0) {
 
-		if(ret < 0)
-			break;
-		networkInfo curNetwork;
 		switch (myEvent.cmd) {
-		case SIOCGIWAP:
-			curNetwork.mac = myEvent.u.ap_addr.sa_data;
-			networkList.push_back(curNetwork);
-			// printf("          Network %d:\n", count+1);
-			break;
-		case SIOCGIWESSID: {
-				char essid[IW_ESSID_MAX_SIZE + 1];
-				memset(essid, '\0', sizeof(essid));
-				if ((myEvent.u.essid.pointer) && (myEvent.u.essid.length))
-					memcpy(essid, myEvent.u.essid.pointer, myEvent.u.essid.length);
+			case SIOCGIWAP:
+				//curNetwork.mac = myEvent.u.ap_addr.sa_data;
+				// printf("          Network %d:\n", count+1);
+				break;
+			case SIOCGIWESSID: {
+					char essid[IW_ESSID_MAX_SIZE + 1];
+					memset(essid, '\0', sizeof(essid));
+					if ((myEvent.u.essid.pointer) && (myEvent.u.essid.length))
+						memcpy(essid, myEvent.u.essid.pointer, myEvent.u.essid.length);
 
-				(myEvent.u.essid.flags) ? networkList.back().essid = essid : networkList.back().essid = "hidden";
+					(myEvent.u.essid.flags) ? curNetwork->essid = essid : curNetwork->essid = "hidden";
+					networkList.push_back(*curNetwork);
+					delete curNetwork;
+					curNetwork = new networkInfo;
+				}
+
+				break;
+			case IWEVQUAL: {
+				curNetwork->level = (myEvent.u.qual.level == 0) ? 0 : myEvent.u.qual.level - 255;
+
 			}
+				break;
+			case SIOCGIWENCODE: {
+				/*	if(event->u.data.flags & IW_ENCODE_DISABLED)
+				 networks[count].encrypted = 0;
+				 else
+				 networks[count].encrypted = 1;
 
-			break;
-		case IWEVQUAL: {
-			//curNetwork.level = static_cast<iw_statistics*>(myEvent.u.data.pointer)->qual.level - 256;
+				 printf("                    Encryption key:%s\n", networks[count].encrypted ? "on" : "off");
+				 break;*/
+				break;
+
+			}
 		}
-			break;
-		case SIOCGIWENCODE: {
-			/*	if(event->u.data.flags & IW_ENCODE_DISABLED)
-			 networks[count].encrypted = 0;
-			 else
-			 networks[count].encrypted = 1;
-
-			 printf("                    Encryption key:%s\n", networks[count].encrypted ? "on" : "off");
-			 break;*/
-			break;
-
-		}
-		}
-
 	}
+	delete curNetwork;
 
 	return true;
 }
