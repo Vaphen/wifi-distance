@@ -26,7 +26,7 @@ struct networkInfo {
 	};
 
 
-#define IW_INTERFACE "wlp0s26u1u1"
+#define IW_INTERFACE "wlp2s0"
 extern int errno; // used for errno message
 
 class NetworkInformation {

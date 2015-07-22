@@ -5,9 +5,8 @@
 #include "gui.h"
 #include "drawingArea.h"
 
-#define WINDOW_WIDTH  800
-#define WINDOW_HEIGHT 800
-
+#define WINDOW_WIDTH  700
+#define WINDOW_HEIGHT 700
 
 int main (int argc, char *argv[])
 {
